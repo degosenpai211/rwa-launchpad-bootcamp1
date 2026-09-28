@@ -6,7 +6,10 @@ export enum ContractErrorCode {
   InvalidAmount = 4,
   NotWhitelisted = 5,
   Paused = 6,
+  AmountTooLow = 7,
 }
+
+export const MIN_INVESTMENT_AMOUNT = 500;
 
 const MESSAGES: Record<ContractErrorCode, string> = {
   [ContractErrorCode.NotInitialized]:
@@ -21,7 +24,13 @@ const MESSAGES: Record<ContractErrorCode, string> = {
     "This wallet is not whitelisted. Ask an admin to approve your address before investing.",
   [ContractErrorCode.Paused]:
     "The launchpad is paused. Mint, transfer, and invest are disabled until an admin unpauses.",
+  [ContractErrorCode.AmountTooLow]:
+    `Investment too low. The minimum investment is ${MIN_INVESTMENT_AMOUNT} units of the payment token.`,
 };
+
+function isKnownContractErrorCode(code: number): boolean {
+  return code in MESSAGES;
+}
 
 export function messageForContractError(
   code: ContractErrorCode | number,
@@ -53,13 +62,15 @@ export function parseContractErrorCode(error: unknown): number | null {
     const match = text.match(re);
     if (match?.[1]) {
       const code = Number(match[1]);
-      if (code >= 1 && code <= 6) return code;
+      if (isKnownContractErrorCode(code)) return code;
     }
   }
 
   // Sometimes the numeric code alone appears near "contract"
-  const loose = text.match(/contract[^0-9]{0,40}#?([1-6])\b/i);
-  if (loose?.[1]) return Number(loose[1]);
+  const loose = text.match(/contract[^0-9]{0,40}#?(\d+)\b/i);
+  if (loose?.[1] && isKnownContractErrorCode(Number(loose[1]))) {
+    return Number(loose[1]);
+  }
 
   return null;
 }

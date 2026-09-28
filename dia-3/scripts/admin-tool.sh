@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Admin tool — invocations that require the issuer/admin key to sign.
-# Replace placeholders before running on testnet.
+# Usage: ./admin-tool.sh <initialize|whitelist|mint|withdraw|pause|unpause> [amount]
 
 set -euo pipefail
 
@@ -11,63 +11,31 @@ PAYMENT_TOKEN="${PAYMENT_TOKEN:-C...INSTRUCTOR_PAYMENT_TOKEN_ID...}"
 INVESTOR="${INVESTOR:-G...INVESTOR_PUBLIC_KEY...}"
 TREASURY="${TREASURY:-G...TREASURY_PUBLIC_KEY...}"
 
-echo "=== initialize (run once after deploy) ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$ADMIN_KEY" \
-  --network "$NETWORK" \
-  -- \
-  initialize \
-  --admin "$(stellar keys address "$ADMIN_KEY")" \
-  --asset '{"name":"RWAToken","total_supply":1000000,"price_per_unit":100,"payment_token":"'"$PAYMENT_TOKEN"'","paused":false}'
+ADMIN_ADDRESS="$(stellar keys address "$ADMIN_KEY")"
 
-echo "=== set_whitelist ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$ADMIN_KEY" \
-  --network "$NETWORK" \
-  -- \
-  set_whitelist \
-  --admin "$(stellar keys address "$ADMIN_KEY")" \
-  --investor "$INVESTOR" \
-  --approved true
+invoke() {
+  stellar contract invoke \
+    --id "$CONTRACT_ID" \
+    --source "$ADMIN_KEY" \
+    --network "$NETWORK" \
+    -- "$@"
+}
 
-echo "=== mint (admin-only; optional if using invest) ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$ADMIN_KEY" \
-  --network "$NETWORK" \
-  -- \
-  mint \
-  --admin "$(stellar keys address "$ADMIN_KEY")" \
-  --to "$INVESTOR" \
-  --amount 100
+initialize() {
+  invoke initialize \
+    --admin "$ADMIN_ADDRESS" \
+    --asset '{"name":"RWAToken","total_supply":1000000,"price_per_unit":100,"payment_token":"'"$PAYMENT_TOKEN"'","paused":false}'
+}
 
-echo "=== withdraw collected payment tokens ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$ADMIN_KEY" \
-  --network "$NETWORK" \
-  -- \
-  withdraw \
-  --admin "$(stellar keys address "$ADMIN_KEY")" \
-  --to "$TREASURY" \
-  --amount 500
-
-echo "=== pause ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$ADMIN_KEY" \
-  --network "$NETWORK" \
-  -- \
-  pause \
-  --admin "$(stellar keys address "$ADMIN_KEY")"
-
-echo "=== unpause ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$ADMIN_KEY" \
-  --network "$NETWORK" \
-  -- \
-  unpause \
-  --admin "$(stellar keys address "$ADMIN_KEY")"
+case "${1:-}" in
+  initialize) initialize ;;
+  whitelist)  invoke set_whitelist --admin "$ADMIN_ADDRESS" --investor "$INVESTOR" --approved true ;;
+  mint)       invoke mint --admin "$ADMIN_ADDRESS" --to "$INVESTOR" --amount "${2:-100}" ;;
+  withdraw)   invoke withdraw --admin "$ADMIN_ADDRESS" --to "$TREASURY" --amount "${2:-500}" ;;
+  pause)      invoke pause --admin "$ADMIN_ADDRESS" ;;
+  unpause)    invoke unpause --admin "$ADMIN_ADDRESS" ;;
+  *)
+    echo "Usage: $0 <initialize|whitelist|mint|withdraw|pause|unpause> [amount]" >&2
+    exit 1
+    ;;
+esac

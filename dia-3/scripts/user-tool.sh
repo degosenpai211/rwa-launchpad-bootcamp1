@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # User tool — invocations signed by the investor / token holder.
-# Replace placeholders before running on testnet.
+# Usage: ./user-tool.sh <invest|balance|transfer> [amount]
 
 set -euo pipefail
 
@@ -9,32 +9,22 @@ USER_KEY="${USER_KEY:-bob}"
 CONTRACT_ID="${CONTRACT_ID:-C...DEPLOYED_LAUNCHPAD_CONTRACT_ID...}"
 RECIPIENT="${RECIPIENT:-G...RECIPIENT_PUBLIC_KEY...}"
 
-echo "=== invest ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$USER_KEY" \
-  --network "$NETWORK" \
-  -- \
-  invest \
-  --investor "$(stellar keys address "$USER_KEY")" \
-  --payment_amount 500
+USER_ADDRESS="$(stellar keys address "$USER_KEY")"
 
-echo "=== balance ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$USER_KEY" \
-  --network "$NETWORK" \
-  -- \
-  balance \
-  --id "$(stellar keys address "$USER_KEY")"
+invoke() {
+  stellar contract invoke \
+    --id "$CONTRACT_ID" \
+    --source "$USER_KEY" \
+    --network "$NETWORK" \
+    -- "$@"
+}
 
-echo "=== transfer RWA tokens ==="
-stellar contract invoke \
-  --id "$CONTRACT_ID" \
-  --source "$USER_KEY" \
-  --network "$NETWORK" \
-  -- \
-  transfer \
-  --from "$(stellar keys address "$USER_KEY")" \
-  --to "$RECIPIENT" \
-  --amount 10
+case "${1:-}" in
+  invest)   invoke invest --investor "$USER_ADDRESS" --payment_amount "${2:-500}" ;;
+  balance)  invoke balance --id "$USER_ADDRESS" ;;
+  transfer) invoke transfer --from "$USER_ADDRESS" --to "$RECIPIENT" --amount "${2:-10}" ;;
+  *)
+    echo "Usage: $0 <invest|balance|transfer> [amount]" >&2
+    exit 1
+    ;;
+esac

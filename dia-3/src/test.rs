@@ -29,6 +29,16 @@ fn setup_with_payment_token(env: &Env) -> (Address, Address, Address, RwaLaunchp
     (admin, payment_token, contract_id, client)
 }
 
+fn setup_whitelisted_investor(env: &Env) -> (Address, RwaLaunchpadClient<'_>) {
+    let (admin, payment_token, _contract_id, client) = setup_with_payment_token(env);
+    let investor = Address::generate(env);
+
+    StellarAssetClient::new(env, &payment_token).mint(&investor, &1_000);
+    client.set_whitelist(&admin, &investor, &true);
+
+    (investor, client)
+}
+
 #[test]
 fn test_invest() {
     let env = Env::default();
@@ -80,4 +90,26 @@ fn test_invest_not_whitelisted() {
 
     env.mock_all_auths();
     client.invest(&investor, &500);
+}
+
+#[test]
+fn test_invest_below_minimum_fails_with_amount_too_low() {
+    let env = Env::default();
+    let (investor, client) = setup_whitelisted_investor(&env);
+
+    let result = client.try_invest(&investor, &100);
+
+    assert_eq!(result, Err(Ok(Error::AmountTooLow.into())));
+    assert_eq!(client.balance(&investor), 0);
+}
+
+#[test]
+fn test_invest_at_minimum_succeeds() {
+    let env = Env::default();
+    let (investor, client) = setup_whitelisted_investor(&env);
+
+    let minted = client.invest(&investor, &500);
+
+    assert_eq!(minted, 5);
+    assert_eq!(client.balance(&investor), 5);
 }
